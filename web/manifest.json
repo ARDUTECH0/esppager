@@ -1,6 +1,6 @@
 {
-    "name": "esppager",
-    "short_name": "esppager",
+    "name": "pager",
+    "short_name": "pager",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

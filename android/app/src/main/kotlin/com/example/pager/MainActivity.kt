@@ -1,4 +1,4 @@
-package com.example.esppager
+package com.example.pager
 
 import io.flutter.embedding.android.FlutterActivity
 
