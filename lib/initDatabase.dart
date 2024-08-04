@@ -4,7 +4,7 @@ import 'package:sqflite/sqflite.dart';
 // Initialize the database
 Future<Database> initDatabase() async {
   var databasesPath = await getDatabasesPath();
-  String path = join(databasesPath, 'orders2.db');
+  String path = join(databasesPath, 'orders.db');
 
   return await openDatabase(
     path,

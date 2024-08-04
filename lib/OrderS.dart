@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:pager/Neworder.dart';
+import 'package:pager/bluetooth_service.dart';
 import 'package:pager/img.dart';
 import 'package:pager/initDatabase.dart';
 import 'package:sqflite/sqflite.dart';
@@ -16,15 +17,17 @@ class App extends StatefulWidget {
       : super(key: key);
 
   @override
-  _MyAppState createState() => _MyAppState();
+  _AppState createState() => _AppState();
 }
 
-class _MyAppState extends State<App> {
-  Locale _locale = Locale('en');
+class _AppState extends State<App> {
+  Locale _locale = const Locale('en');
 
   void _changeLanguage() {
     setState(() {
-      _locale = _locale.languageCode == 'en' ? Locale('ar') : Locale('en');
+      _locale = _locale.languageCode == 'en'
+          ? const Locale('ar')
+          : const Locale('en');
     });
   }
 
@@ -41,7 +44,7 @@ class _MyAppState extends State<App> {
       ],
       supportedLocales: S.delegate.supportedLocales,
       locale: _locale,
-      home: OrderS(
+      home: OrderScreen(
         changeLanguage: _changeLanguage,
         database: widget.database,
         device: widget.device,
@@ -50,12 +53,12 @@ class _MyAppState extends State<App> {
   }
 }
 
-class OrderS extends StatefulWidget {
+class OrderScreen extends StatefulWidget {
   final VoidCallback changeLanguage;
   final Database database;
   final BluetoothDevice device;
 
-  const OrderS({
+  const OrderScreen({
     required this.changeLanguage,
     required this.database,
     required this.device,
@@ -63,11 +66,12 @@ class OrderS extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<OrderS> createState() => _OrderSState();
+  State<OrderScreen> createState() => _OrderScreenState();
 }
 
-class _OrderSState extends State<OrderS> {
+class _OrderScreenState extends State<OrderScreen> {
   int _lastOrderNumber = 0;
+  late CustomBluetoothService _bluetoothService;
   int _deviceNumber = 0;
   BluetoothCharacteristic? targetCharacteristic;
   String readValue = "";
@@ -79,77 +83,14 @@ class _OrderSState extends State<OrderS> {
   @override
   void initState() {
     super.initState();
+    _bluetoothService = CustomBluetoothService(widget.device);
+    _bluetoothService.initialize();
     _getLastOrderNumber();
-    _connectionSubscription = widget.device.state.listen((state) {
-      if (state == BluetoothDeviceState.connected) {
-        setState(() {
-          isConnected = true;
-        });
-        discoverServices();
-      } else {
-        setState(() {
-          isConnected = false;
-        });
-      }
-    });
-    connectToDevice();
-  }
-
-  Future<void> connectToDevice() async {
-    try {
-      await widget.device.connect(autoConnect: false);
-    } catch (e) {
-      if (e.toString() != 'already_connected') {
-        print("Error connecting to device: $e");
-      }
-    }
-  }
-
-  Future<void> discoverServices() async {
-    if (isConnected) {
-      List<BluetoothService> services = await widget.device.discoverServices();
-      for (BluetoothService service in services) {
-        for (BluetoothCharacteristic characteristic
-            in service.characteristics) {
-          if (characteristic.uuid.toString() ==
-              "beb5483e-36e1-4688-b7f5-ea07361b26a8") {
-            setState(() {
-              targetCharacteristic = characteristic;
-            });
-          }
-        }
-      }
-    }
-  }
-
-  Future<void> writeMessage(String message) async {
-    if (targetCharacteristic != null) {
-      try {
-        await targetCharacteristic!.write(message.codeUnits);
-        readMessage();
-      } catch (e) {
-        print("Error writing to characteristic: $e");
-      }
-    } else {
-      print("Characteristic is null");
-    }
-  }
-
-  Future<void> readMessage() async {
-    if (targetCharacteristic != null) {
-      try {
-        var value = await targetCharacteristic!.read();
-        setState(() {
-          readValue = String.fromCharCodes(value);
-        });
-      } catch (e) {
-        print("Error reading from characteristic: $e");
-      }
-    }
   }
 
   @override
   void dispose() {
+    _bluetoothService.dispose();
     _connectionSubscription.cancel();
     widget.device.disconnect();
     super.dispose();
@@ -164,7 +105,6 @@ class _OrderSState extends State<OrderS> {
       if (results.isNotEmpty) {
         int lastOrderNumber =
             int.tryParse(results[0]['order_number'].toString()) ?? 0;
-
         setState(() {
           _lastOrderNumber = lastOrderNumber;
         });
@@ -216,7 +156,7 @@ class _OrderSState extends State<OrderS> {
   }
 
   Future<void> _sendDeviceId(String deviceId) async {
-    writeMessage("SEND $deviceId order call");
+    _bluetoothService.writeMessage("SEND $deviceId order call");
   }
 
   List<Map<String, dynamic>> sortOrders(List<Map<String, dynamic>> orders) {
@@ -252,7 +192,7 @@ class _OrderSState extends State<OrderS> {
         children: [
           Expanded(
             child: Container(
-              color: Color(0xFFe0e0e0),
+              color: const Color(0xFFe0e0e0),
               child: Stack(
                 children: [
                   Positioned(
@@ -264,7 +204,7 @@ class _OrderSState extends State<OrderS> {
                           onPressed: widget.changeLanguage,
                           child: Text(
                             S.of(context).changeLanguage,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
@@ -275,12 +215,13 @@ class _OrderSState extends State<OrderS> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) =>
-                                      DeviceManagementScreen()),
+                                  builder: (context) => DeviceManagementScreen(
+                                        bluetoothService: _bluetoothService,
+                                      )),
                               (route) => true,
                             );
                           },
-                          icon: Icon(
+                          icon: const Icon(
                             Icons.settings,
                             size: 32,
                             color: Colors.grey,
@@ -303,7 +244,7 @@ class _OrderSState extends State<OrderS> {
                             ),
                             Text(
                               _deviceNumber.toString(),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 40,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black,
@@ -311,31 +252,31 @@ class _OrderSState extends State<OrderS> {
                             ),
                           ],
                         ),
-                        SizedBox(width: 20),
+                        const SizedBox(width: 20),
                         Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
                               S.of(context).invoiceOrPhoneNumber,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 10),
+                            const SizedBox(height: 10),
                             Container(
                               width: 200,
                               color: Colors.white,
                               child: TextField(
                                 controller: _searchController,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 24),
-                                decoration: InputDecoration(
+                                style: const TextStyle(fontSize: 24),
+                                decoration: const InputDecoration(
                                   border: OutlineInputBorder(),
                                 ),
                               ),
                             ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 20),
                             SizedBox(
                               height: 70,
                               width: 200,
@@ -343,7 +284,7 @@ class _OrderSState extends State<OrderS> {
                                 onPressed: _search,
                                 child: Text(
                                   S.of(context).call,
-                                  style: TextStyle(fontSize: 24),
+                                  style: const TextStyle(fontSize: 24),
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
@@ -373,14 +314,15 @@ class _OrderSState extends State<OrderS> {
                                 return ListTile(
                                   title: Text(
                                     '${S.of(context).order}: ${order['order_number']}, ${S.of(context).device}: ${order['device_number']}',
-                                    style: TextStyle(fontSize: 18),
+                                    style: const TextStyle(fontSize: 18),
                                   ),
                                   subtitle: Text(
                                     '${S.of(context).phone}: ${order['phone_number']}',
-                                    style: TextStyle(fontSize: 16),
+                                    style: const TextStyle(fontSize: 16),
                                   ),
                                   trailing: IconButton(
-                                    icon: Icon(Icons.delete, color: Colors.red),
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
                                     onPressed: () => _deleteOrder(
                                         order['order_number'].toString()),
                                   ),
@@ -405,7 +347,7 @@ class _OrderSState extends State<OrderS> {
         children: [
           Expanded(
             child: Container(
-              color: Color(0xFFe0e0e0),
+              color: const Color(0xFFe0e0e0),
               child: Stack(
                 children: [
                   Positioned(
@@ -417,7 +359,7 @@ class _OrderSState extends State<OrderS> {
                           onPressed: widget.changeLanguage,
                           child: Text(
                             S.of(context).changeLanguage,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -428,12 +370,13 @@ class _OrderSState extends State<OrderS> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) =>
-                                      DeviceManagementScreen()),
+                                  builder: (context) => DeviceManagementScreen(
+                                        bluetoothService: _bluetoothService,
+                                      )),
                               (route) => true,
                             );
                           },
-                          icon: Icon(
+                          icon: const Icon(
                             Icons.settings,
                             size: 28,
                             color: Colors.grey,
@@ -443,7 +386,7 @@ class _OrderSState extends State<OrderS> {
                           onPressed: () {
                             // Add notification logic here
                           },
-                          icon: Icon(
+                          icon: const Icon(
                             Icons.notifications,
                             size: 28,
                             color: Colors.grey,
@@ -466,7 +409,7 @@ class _OrderSState extends State<OrderS> {
                             ),
                             Text(
                               _deviceNumber.toString(),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black,
@@ -474,28 +417,28 @@ class _OrderSState extends State<OrderS> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         Text(
                           S.of(context).invoiceOrPhoneNumber,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         Container(
                           width: MediaQuery.of(context).size.width * 0.8,
                           color: Colors.white,
                           child: TextField(
                             controller: _searchController,
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 18),
-                            decoration: InputDecoration(
+                            style: const TextStyle(fontSize: 18),
+                            decoration: const InputDecoration(
                               border: OutlineInputBorder(),
                             ),
                           ),
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         SizedBox(
                           height: 50,
                           width: MediaQuery.of(context).size.width * 0.6,
@@ -503,7 +446,7 @@ class _OrderSState extends State<OrderS> {
                             onPressed: _search,
                             child: Text(
                               S.of(context).call,
-                              style: TextStyle(fontSize: 18),
+                              style: const TextStyle(fontSize: 18),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
@@ -513,7 +456,7 @@ class _OrderSState extends State<OrderS> {
                             ),
                           ),
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         _searchResults.isNotEmpty
                             ? Container(
                                 width: MediaQuery.of(context).size.width * 0.9,
@@ -526,24 +469,24 @@ class _OrderSState extends State<OrderS> {
                                     return ListTile(
                                       title: Text(
                                         '${S.of(context).order}: ${order['order_number']}, ${S.of(context).device}: ${order['device_number']}',
-                                        style: TextStyle(fontSize: 16),
+                                        style: const TextStyle(fontSize: 16),
                                       ),
                                       subtitle: Text(
                                         '${S.of(context).phone}: ${order['phone_number']}',
-                                        style: TextStyle(fontSize: 14),
+                                        style: const TextStyle(fontSize: 14),
                                       ),
                                       trailing: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: Icon(Icons.delete,
+                                            icon: const Icon(Icons.delete,
                                                 color: Colors.red),
                                             onPressed: () => _deleteOrder(
                                                 order['order_number']
                                                     .toString()),
                                           ),
                                           IconButton(
-                                            icon: Icon(Icons.call,
+                                            icon: const Icon(Icons.call,
                                                 color: Colors.green),
                                             onPressed: () => _sendDeviceId(
                                                 order['device_number']

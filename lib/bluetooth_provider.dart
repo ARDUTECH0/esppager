@@ -44,7 +44,8 @@ class _FindDevicesScreenState extends State<FindDevicesScreen> {
                 builder: (c, snapshot) => Column(
                   children: snapshot.data!
                       .map((d) => ListTile(
-                            title: Text(d.name),
+                            title: Text(
+                                d.name.isNotEmpty ? d.name : 'Unnamed Device'),
                             subtitle: Text(d.id.toString()),
                             trailing: StreamBuilder<BluetoothDeviceState>(
                               stream: d.state,
@@ -56,8 +57,10 @@ class _FindDevicesScreenState extends State<FindDevicesScreen> {
                                     child: Text('OPEN'),
                                     onPressed: () => Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (context) =>
-                                            App(database: _database, device: d),
+                                        builder: (context) => App(
+                                          database: _database,
+                                          device: d,
+                                        ),
                                       ),
                                     ),
                                   );
@@ -82,9 +85,9 @@ class _FindDevicesScreenState extends State<FindDevicesScreen> {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (context) => App(
-                                        database: _database,
-                                        device: r
-                                            .device), // Pass the database instance
+                                      database: _database,
+                                      device: r.device,
+                                    ),
                                   ),
                                 );
                               } catch (e) {
@@ -137,7 +140,7 @@ class ScanResultTile extends StatelessWidget {
       title: Text(result.device.name.isNotEmpty
           ? result.device.name
           : result.device.id.toString()),
-      subtitle: Text(result.rssi.toString()),
+      subtitle: Text('RSSI: ${result.rssi}'),
       onTap: onTap,
     );
   }

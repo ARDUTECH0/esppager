@@ -1,13 +1,18 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:pager/OrderS.dart';
+import 'package:pager/bluetooth_service.dart';
 import 'package:pager/img.dart';
 import 'package:pager/initDatabase.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 class AddDeviceScreen extends StatefulWidget {
-  const AddDeviceScreen({super.key});
+  final CustomBluetoothService bluetoothService;
+
+  const AddDeviceScreen({Key? key, required this.bluetoothService})
+      : super(key: key);
 
   @override
   State<AddDeviceScreen> createState() => _AddDeviceScreenState();
@@ -15,6 +20,8 @@ class AddDeviceScreen extends StatefulWidget {
 
 class _AddDeviceScreenState extends State<AddDeviceScreen> {
   late Database _db;
+  late CustomBluetoothService _bluetoothService;
+
   final TextEditingController _controller = TextEditingController();
   QRViewController? _controllerQR;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
@@ -22,6 +29,7 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
   @override
   void initState() {
     super.initState();
+    _bluetoothService = widget.bluetoothService;
     _initializeDatabase();
   }
 
@@ -34,8 +42,7 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
       String macAddress = _controller.text;
       int newId = await addNewDevice(_db, macAddress);
       print('ADD $newId $macAddress');
-
-      Navigator.pop(context, newId);
+      _bluetoothService.writeMessage("ADD $newId $macAddress");
     } catch (e) {
       print('Error in _addNewDevice: $e');
     }

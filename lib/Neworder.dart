@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pager/addNewDevice.dart';
+import 'package:pager/bluetooth_service.dart';
 import 'package:pager/img.dart';
 import 'package:pager/initDatabase.dart';
 import 'package:sqflite/sqflite.dart';
@@ -80,6 +81,10 @@ class DottedBorderPainter extends CustomPainter {
 }
 
 class DeviceManagementScreen extends StatefulWidget {
+  final CustomBluetoothService bluetoothService;
+
+  const DeviceManagementScreen({Key? key, required this.bluetoothService})
+      : super(key: key);
   @override
   _DeviceManagementScreenState createState() => _DeviceManagementScreenState();
 }
@@ -112,7 +117,10 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   void _addNewDevice() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => AddDeviceScreen()),
+      MaterialPageRoute(
+          builder: (context) => AddDeviceScreen(
+                bluetoothService: widget.bluetoothService,
+              )),
     );
   }
 
