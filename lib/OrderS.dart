@@ -1,20 +1,20 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:open_settings_plus/core/open_settings_plus.dart';
 import 'package:pager/Neworder.dart';
-import 'package:pager/bluetooth_service.dart';
+import 'package:pager/WebSocket.dart';
 import 'package:pager/img.dart';
-import 'package:pager/initDatabase.dart';
+import 'package:pager/main.dart';
 import 'package:sqflite/sqflite.dart';
 import 'generated/l10n.dart';
 
 class App extends StatefulWidget {
   final Database database;
-  final BluetoothDevice device;
 
-  const App({required this.database, required this.device, Key? key})
-      : super(key: key);
+  const App({required this.database, Key? key}) : super(key: key);
 
   @override
   _AppState createState() => _AppState();
@@ -47,7 +47,6 @@ class _AppState extends State<App> {
       home: OrderScreen(
         changeLanguage: _changeLanguage,
         database: widget.database,
-        device: widget.device,
       ),
     );
   }
@@ -56,12 +55,10 @@ class _AppState extends State<App> {
 class OrderScreen extends StatefulWidget {
   final VoidCallback changeLanguage;
   final Database database;
-  final BluetoothDevice device;
 
   const OrderScreen({
     required this.changeLanguage,
     required this.database,
-    required this.device,
     Key? key,
   }) : super(key: key);
 
@@ -71,7 +68,8 @@ class OrderScreen extends StatefulWidget {
 
 class _OrderScreenState extends State<OrderScreen> {
   int _lastOrderNumber = 0;
-  late CustomBluetoothService _bluetoothService;
+  bool Statuss = false;
+
   int _deviceNumber = 0;
   BluetoothCharacteristic? targetCharacteristic;
   String readValue = "";
@@ -83,16 +81,31 @@ class _OrderScreenState extends State<OrderScreen> {
   @override
   void initState() {
     super.initState();
-    _bluetoothService = CustomBluetoothService(widget.device);
-    _bluetoothService.initialize();
+    _startListeningToWebSocket();
+
     _getLastOrderNumber();
+  }
+
+  void _startListeningToWebSocket() async {
+    webSocketService.incomingMessages.listen((message) {
+      //   print('Received message: $message');
+      try {
+        final jsonData = jsonDecode(message);
+        if (jsonData is Map<String, dynamic>) {}
+      } catch (e) {
+        print('Error parsing WebSocket message: $e');
+      }
+    });
+    webSocketService.connectionStatus.listen((incoming) {
+      setState(() {
+        Statuss = incoming == ConnectionStatus.disconnected ? false : true;
+      });
+      print(Statuss);
+    });
   }
 
   @override
   void dispose() {
-    _bluetoothService.dispose();
-    _connectionSubscription.cancel();
-    widget.device.disconnect();
     super.dispose();
   }
 
@@ -134,7 +147,11 @@ class _OrderScreenState extends State<OrderScreen> {
     }
 
     if (RegExp(r'^\d+$').hasMatch(query)) {
-      results = await getOrdersByOrderNumber(widget.database, query);
+      if (query.length > 4) {
+        results = await getOrdersByPhoneNumber(widget.database, query);
+      } else {
+        results = await getOrdersByOrderNumber(widget.database, query);
+      }
     } else {
       results = await getOrdersByPhoneNumber(widget.database, query);
     }
@@ -156,7 +173,7 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   Future<void> _sendDeviceId(String deviceId) async {
-    _bluetoothService.writeMessage("SEND $deviceId order call");
+    webSocketService.sendMessage("SEND $deviceId order call");
   }
 
   List<Map<String, dynamic>> sortOrders(List<Map<String, dynamic>> orders) {
@@ -183,7 +200,60 @@ class _OrderScreenState extends State<OrderScreen> {
   Widget build(BuildContext context) {
     final bool isTablet = MediaQuery.of(context).size.shortestSide >= 600;
 
-    return isTablet ? buildTabletLayout(context) : buildMobileLayout(context);
+    return Statuss
+        ? (isTablet ? buildTabletLayout(context) : buildMobileLayout(context))
+        : buildLayoutd(context);
+  }
+
+  Future<void> _openWiFiSettings() async {
+    final settings = OpenSettingsPlus.shared;
+    if (settings is OpenSettingsPlusAndroid) {
+      settings.wifi();
+    } else if (settings is OpenSettingsPlusIOS) {
+      settings.wifi();
+    } else {
+      throw Exception('Platform not supported');
+    }
+  }
+
+  Widget buildLayoutd(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              "No connection on the device",
+              style: TextStyle(fontSize: 25),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (!Statuss) {
+                  webSocketService.redial();
+                }
+              },
+              child: Text(
+                "Reconnect",
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: _openWiFiSettings,
+              child: Text(
+                "Connect to Wi-Fi",
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget buildTabletLayout(BuildContext context) {
@@ -215,9 +285,8 @@ class _OrderScreenState extends State<OrderScreen> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) => DeviceManagementScreen(
-                                        bluetoothService: _bluetoothService,
-                                      )),
+                                  builder: (context) =>
+                                      DeviceManagementScreen()),
                               (route) => true,
                             );
                           },
@@ -370,9 +439,8 @@ class _OrderScreenState extends State<OrderScreen> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) => DeviceManagementScreen(
-                                        bluetoothService: _bluetoothService,
-                                      )),
+                                  builder: (context) =>
+                                      DeviceManagementScreen()),
                               (route) => true,
                             );
                           },

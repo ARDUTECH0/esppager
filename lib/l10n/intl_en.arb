@@ -1,20 +1,21 @@
 {
-    "invoiceOrPhoneNumber": "Invoice or Phone Number",
-    "call": "Call",
-    "changeLanguage": "Ar",
-    "currentLanguage": "En",
-    "order": "Order",
-    "device": "Device",
-    "phone": "Phone",
-    "add_new_device": "Add New Device",
-    "new_order": "New Order",
-    "date": "Wednesday\n2024/12/12",
-    "invoice_number": "Invoice Number",
-    "phone_number": "Phone Number",
-    "device_number": "Device Number",
-    "preparing_device": "Now Preparing",
-    "device2": "Device Number",
-    "ready_check": "Ready Check",
-    "ready": "Ready"
-  }
+  "invoiceOrPhoneNumber": "Invoice or Phone Number",
+  "call": "Call",
+  "changeLanguage": "Ar",
+  "currentLanguage": "En",
+  "order": "Order",
+  "device": "Device",
+  "phone": "Phone",
+  "add_new_device": "Add New Device",
+  "new_order": "New Order",
+  "date": "Wednesday\n2024/12/12",
+  "invoice_number": "Invoice Number",
+  "phone_number": "Phone Number",
+  "device_number": "Device Number",
+  "preparing_device": "Now Preparing",
+  "device2": "Device Number",
+  "ready_check": "Ready Check",
+  "ready": "Ready"
+}
+
   

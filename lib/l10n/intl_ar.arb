@@ -1,20 +1,19 @@
 {
-    "invoiceOrPhoneNumber": "رقم الفاتورة أو رقم الهاتف",
-    "call": "اتصال",
-    "changeLanguage": "EN",
-    "currentLanguage": "العربية",
-    "order": "طلب",
-    "device": "جهاز",
-    "phone": "الهاتف",
-    "add_new_device": "إضافة جهاز جديد",
-    "new_order": "طلب جديد",
-    "date": "الأربعاء\n2024/12/12",
-    "invoice_number": "رقم الفاتورة",
-    "phone_number": "رقم الجوال",
-    "device_number": "رقم الجهاز",
-    "preparing_device": "الآن جاري تجهيز",
-    "device2": "جهاز رقم",
-    "ready_check": "التحقق من الجهاز",
-    "ready": "جاهز"
-  }
-  
+  "invoiceOrPhoneNumber": "رقم الفاتورة أو رقم الهاتف",
+  "call": "اتصال",
+  "changeLanguage": "EN",
+  "currentLanguage": "العربية",
+  "order": "طلب",
+  "device": "جهاز",
+  "phone": "الهاتف",
+  "add_new_device": "إضافة جهاز جديد",
+  "new_order": "طلب جديد",
+  "date": "الأربعاء\n2024/12/12",
+  "invoice_number": "رقم الفاتورة",
+  "phone_number": "رقم الجوال",
+  "device_number": "رقم الجهاز",
+  "preparing_device": "الآن جاري تجهيز",
+  "device2": "جهاز رقم",
+  "ready_check": "التحقق من الجهاز",
+  "ready": "جاهز"
+}

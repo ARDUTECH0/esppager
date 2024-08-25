@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:pager/OrderS.dart';
-import 'package:pager/bluetooth_provider.dart';
+import 'package:pager/WebSocket.dart';
 import 'package:sqflite/sqflite.dart';
 import 'initDatabase.dart';
+
+final WebSocketService webSocketService = WebSocketService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +22,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: FindDevicesScreen(),
+      home: App(
+        database: database,
+      ),
     );
   }
 }
