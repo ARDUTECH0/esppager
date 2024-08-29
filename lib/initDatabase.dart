@@ -183,6 +183,24 @@ Future<int> getLatestDeviceId(Database db) async {
   }
 }
 
+Future<void> updateOrder(Database db, String orderNumber, String deviceNumber,
+    String phoneNumber) async {
+  try {
+    await db.update(
+      'Orders',
+      {
+        'device_number': deviceNumber,
+        'phone_number': phoneNumber,
+      },
+      where: 'order_number = ?',
+      whereArgs: [orderNumber],
+    );
+  } catch (e) {
+    print('Error updating order: $e');
+    rethrow;
+  }
+}
+
 // Add a new device with an incremented ID
 Future<int> addNewDevice(Database db, String macAddress) async {
   try {
@@ -197,6 +215,3 @@ Future<int> addNewDevice(Database db, String macAddress) async {
     rethrow;
   }
 }
-
-// Example function to use the above methods
-

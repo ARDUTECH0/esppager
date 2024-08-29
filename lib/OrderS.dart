@@ -88,7 +88,6 @@ class _OrderScreenState extends State<OrderScreen> {
 
   void _startListeningToWebSocket() async {
     webSocketService.incomingMessages.listen((message) {
-      //   print('Received message: $message');
       try {
         final jsonData = jsonDecode(message);
         if (jsonData is Map<String, dynamic>) {}
@@ -374,6 +373,7 @@ class _OrderScreenState extends State<OrderScreen> {
                     right: 20,
                     child: _searchResults.isNotEmpty
                         ? Container(
+                            width: MediaQuery.of(context).size.width * 0.9,
                             color: Colors.white,
                             child: ListView.builder(
                               shrinkWrap: true,
@@ -383,17 +383,28 @@ class _OrderScreenState extends State<OrderScreen> {
                                 return ListTile(
                                   title: Text(
                                     '${S.of(context).order}: ${order['order_number']}, ${S.of(context).device}: ${order['device_number']}',
-                                    style: const TextStyle(fontSize: 18),
+                                    style: const TextStyle(fontSize: 16),
                                   ),
                                   subtitle: Text(
                                     '${S.of(context).phone}: ${order['phone_number']}',
-                                    style: const TextStyle(fontSize: 16),
+                                    style: const TextStyle(fontSize: 14),
                                   ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.delete,
-                                        color: Colors.red),
-                                    onPressed: () => _deleteOrder(
-                                        order['order_number'].toString()),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () => _deleteOrder(
+                                            order['order_number'].toString()),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.call,
+                                            color: Colors.green),
+                                        onPressed: () => _sendDeviceId(
+                                            order['device_number'].toString()),
+                                      ),
+                                    ],
                                   ),
                                 );
                               },
@@ -450,16 +461,16 @@ class _OrderScreenState extends State<OrderScreen> {
                             color: Colors.grey,
                           ),
                         ),
-                        IconButton(
-                          onPressed: () {
-                            // Add notification logic here
-                          },
-                          icon: const Icon(
-                            Icons.notifications,
-                            size: 28,
-                            color: Colors.grey,
-                          ),
-                        ),
+                        // IconButton(
+                        //   onPressed: () {
+                        //     // Add notification logic here
+                        //   },
+                        //   icon: const Icon(
+                        //     Icons.notifications,
+                        //     size: 28,
+                        //     color: Colors.grey,
+                        //   ),
+                        // ),
                       ],
                     ),
                   ),

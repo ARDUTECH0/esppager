@@ -1,5 +1,4 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pager/addNewDevice.dart';
@@ -83,6 +82,7 @@ class DeviceManagementScreen extends StatefulWidget {
   const DeviceManagementScreen({
     Key? key,
   }) : super(key: key);
+
   @override
   _DeviceManagementScreenState createState() => _DeviceManagementScreenState();
 }
@@ -106,8 +106,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     List<Map<String, dynamic>> deviceRows = await getDevices(_db);
     setState(() {
       devices = deviceRows.map((row) {
-        // Map your actual data to DeviceStatus here
-        return DeviceStatus.available; // Placeholder
+        return DeviceStatus.available;
       }).toList();
     });
   }
@@ -119,13 +118,20 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     );
   }
 
-  void _showNewRequestForm() {
+  void _showNewRequestForm(
+      {String orderNumber = '',
+      String phoneNumber = '',
+      String deviceNumber = ''}) {
     showModalBottomSheet(
       isScrollControlled: true, // This allows the bottom sheet to be scrollable
       context: context,
       builder: (context) => DeviceDetailsPanel(
         width: MediaQuery.of(context).size.width,
         height: MediaQuery.of(context).size.height,
+        orderNumber: orderNumber,
+        phoneNumber: phoneNumber,
+        deviceNumber: deviceNumber,
+        isEditing: orderNumber.isNotEmpty,
       ),
     );
   }
@@ -133,7 +139,9 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFe0e0e0),
       appBar: AppBar(
+        backgroundColor: const Color(0xFFe0e0e0),
         title: Text('Device Management'),
       ),
       body: LayoutBuilder(
@@ -153,7 +161,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
           return width > 600
               ? SizedBox.shrink() // Equivalent to "no widget" for tablets
               : FloatingActionButton(
-                  onPressed: _showNewRequestForm,
+                  onPressed: () => _showNewRequestForm(),
                   child: Icon(Icons.add),
                   tooltip: 'Add New Request',
                 );
@@ -162,8 +170,41 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     );
   }
 
+  void _onDeviceTap(int deviceNumber) async {
+    try {
+      // Fetch orders based on the device number (assuming `device_number` matches the `deviceNumber`)
+      List<Map<String, dynamic>> orders =
+          await getOrdersByOrderNumber(_db, deviceNumber.toString());
+
+      if (orders.isNotEmpty) {
+        // Assuming that you only expect one order per device
+        Map<String, dynamic> order = orders.first;
+        _showNewRequestForm(
+          orderNumber: order['order_number'],
+          phoneNumber: order['phone_number'],
+          deviceNumber: order['device_number'],
+        );
+      } else {
+        // No order found for this device number
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No invoice found for this device.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to retrieve invoice: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Widget _buildTabletLayout(double width, double height) {
-    double panelWidth = width * 0.25;
+    double panelWidth = width * 0.30;
 
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -171,11 +212,11 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
         children: [
           Expanded(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 AddNewDeviceButton(onPressed: _addNewDevice),
                 Container(
-                  width: 600,
+                  width: 500,
                   height: 500,
                   child: DottedBorder(
                     borderWidth: 2,
@@ -184,7 +225,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                       padding: const EdgeInsets.all(20),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
+                        crossAxisCount: 2,
                         mainAxisSpacing: 10.0,
                         crossAxisSpacing: 10.0,
                       ),
@@ -193,20 +234,16 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                         return DeviceTile(
                           deviceNumber: index + 1,
                           status: devices[index],
+                          onTap: _onDeviceTap,
                         );
                       },
                     ),
                   ),
                 ),
-                SizedBox(width: 20),
-                Container(
-                  width: 300,
-                  height: 800,
-                  child: SingleChildScrollView(
-                    child: DeviceDetailsPanel(
-                      width: panelWidth,
-                      height: 2000,
-                    ),
+                SingleChildScrollView(
+                  child: DeviceDetailsPanel(
+                    width: panelWidth,
+                    height: 150,
                   ),
                 ),
               ],
@@ -241,6 +278,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                   return DeviceTile(
                     deviceNumber: index + 1,
                     status: devices[index],
+                    onTap: _onDeviceTap,
                   );
                 },
               ),
@@ -257,41 +295,35 @@ enum DeviceStatus { available, unavailable }
 class DeviceTile extends StatelessWidget {
   final int deviceNumber;
   final DeviceStatus status;
+  final Function(int) onTap;
 
-  const DeviceTile({required this.deviceNumber, required this.status});
+  const DeviceTile(
+      {required this.deviceNumber, required this.status, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage(IconManager.Ts), // Update with actual image path
-        ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Text(
-            '$deviceNumber',
-            style: const TextStyle(
-              fontSize: 40,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+    return GestureDetector(
+      onTap: () =>
+          onTap(deviceNumber), // Trigger the callback with the device number
+      child: Container(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(IconManager.Ts), // Update with actual image path
           ),
-          // Positioned(
-          //   bottom: 20,
-          //   left: 40,
-          //   child: Icon(
-          //     status == DeviceStatus.available
-          //         ? Icons.check_circle
-          //         : Icons.cancel,
-          //     color:
-          //         status == DeviceStatus.available ? Colors.green : Colors.red,
-          //     size: 35,
-          //   ),
-          // ),
-        ],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Text(
+              '$deviceNumber',
+              style: const TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -352,8 +384,19 @@ class AddNewDeviceButton extends StatelessWidget {
 class DeviceDetailsPanel extends StatefulWidget {
   final double width;
   final double height;
+  final String orderNumber;
+  final String phoneNumber;
+  final String deviceNumber;
+  final bool isEditing;
 
-  DeviceDetailsPanel({required this.width, required this.height});
+  DeviceDetailsPanel({
+    required this.width,
+    required this.height,
+    this.orderNumber = '',
+    this.phoneNumber = '',
+    this.deviceNumber = '',
+    this.isEditing = false,
+  });
 
   @override
   State<DeviceDetailsPanel> createState() => _DeviceDetailsPanelState();
@@ -362,42 +405,65 @@ class DeviceDetailsPanel extends StatefulWidget {
 class _DeviceDetailsPanelState extends State<DeviceDetailsPanel> {
   late Database _db;
 
-  final TextEditingController ID = TextEditingController();
-  final TextEditingController phn = TextEditingController();
-  final TextEditingController Did = TextEditingController();
+  final TextEditingController _orderNumberController = TextEditingController();
+  final TextEditingController _phoneNumberController = TextEditingController();
+  final TextEditingController _deviceNumberController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _initializeDatabase();
+
+    // Initialize fields if editing
+    if (widget.isEditing) {
+      _orderNumberController.text = widget.orderNumber;
+      _phoneNumberController.text = widget.phoneNumber;
+      _deviceNumberController.text = widget.deviceNumber;
+    }
   }
 
   Future<void> _initializeDatabase() async {
     _db = await initDatabase();
   }
 
-  Future<void> _insertOrder() async {
+  Future<void> _saveChanges() async {
     try {
-      await insertOrder(
-        _db,
-        ID.text,
-        Did.text,
-        phn.text,
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Order added successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      // Clear fields after successful insertion
-      ID.clear();
-      Did.clear();
-      phn.clear();
+      if (widget.isEditing) {
+        // Assumes ID is the order number in this context. Adjust if needed.
+        await updateOrder(
+          _db,
+          _orderNumberController.text,
+          _deviceNumberController.text,
+          _phoneNumberController.text,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Order updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        await insertOrder(
+          _db,
+          _orderNumberController.text,
+          _deviceNumberController.text,
+          _phoneNumberController.text,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Order added successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      // Clear fields after successful operation
+      _orderNumberController.clear();
+      _deviceNumberController.clear();
+      _phoneNumberController.clear();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to add order: $e'),
+          content: Text('Failed to save order: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -406,9 +472,9 @@ class _DeviceDetailsPanelState extends State<DeviceDetailsPanel> {
 
   @override
   void dispose() {
-    ID.dispose();
-    phn.dispose();
-    Did.dispose();
+    _orderNumberController.dispose();
+    _phoneNumberController.dispose();
+    _deviceNumberController.dispose();
     super.dispose();
   }
 
@@ -440,11 +506,15 @@ class _DeviceDetailsPanelState extends State<DeviceDetailsPanel> {
             width: widget.width,
             decoration: const BoxDecoration(
               color: Colors.blue,
-              borderRadius: BorderRadius.only(topLeft: Radius.circular(60)),
+              borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(15),
+                  bottomLeft: Radius.circular(15),
+                  topRight: Radius.circular(15),
+                  bottomRight: Radius.circular(15)),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                'طلب جديد',
+                widget.isEditing ? 'تعديل طلب' : 'طلب جديد',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 50,
@@ -466,14 +536,14 @@ class _DeviceDetailsPanelState extends State<DeviceDetailsPanel> {
             textAlign: TextAlign.center,
           ),
           SizedBox(height: widget.height * 0.02),
-          _buildTextField('رقم الفاتورة', ID),
+          _buildTextField('رقم الفاتورة', _orderNumberController),
           SizedBox(height: widget.height * 0.01),
-          _buildTextField('رقم الجهاز', Did),
+          _buildTextField('رقم الجهاز', _deviceNumberController),
           SizedBox(height: widget.height * 0.01),
-          _buildTextField('رقم الهاتف', phn),
+          _buildTextField('رقم الهاتف', _phoneNumberController),
           SizedBox(height: widget.height * 0.03),
           GestureDetector(
-            onTap: _insertOrder,
+            onTap: _saveChanges,
             child: Container(
               height: 50,
               width: 200,
@@ -485,7 +555,7 @@ class _DeviceDetailsPanelState extends State<DeviceDetailsPanel> {
               ),
               child: Center(
                 child: Text(
-                  'إرسال',
+                  widget.isEditing ? 'تعديل' : 'إرسال',
                   style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.bold,

@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:pager/OrderS.dart';
 import 'package:pager/bluetooth_service.dart';
 import 'package:pager/img.dart';
 import 'package:pager/initDatabase.dart';
@@ -9,8 +10,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 class AddDeviceScreen extends StatefulWidget {
-  // final CustomBluetoothService bluetoothService;
-
   const AddDeviceScreen({
     Key? key,
   }) : super(key: key);
@@ -21,10 +20,10 @@ class AddDeviceScreen extends StatefulWidget {
 
 class _AddDeviceScreenState extends State<AddDeviceScreen> {
   late Database _db;
-
   final TextEditingController _controller = TextEditingController();
   QRViewController? _controllerQR;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  bool _isLoading = false; // Add this variable to track loading state
 
   @override
   void initState() {
@@ -37,22 +36,44 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
   }
 
   Future<void> _addNewDevice() async {
+    setState(() {
+      _isLoading = true; // Start loading
+    });
+
     try {
       String macAddress = _controller.text;
+
+      // Check if macAddress is empty
+      if (macAddress.isEmpty) {
+        print('Error: MAC address is empty. Device not added.');
+        setState(() {
+          _isLoading = false; // Stop loading
+        });
+        return; // Exit the function if MAC address is empty
+      }
+
       int newId = await addNewDevice(_db, macAddress);
       print('ADD $newId $macAddress');
       webSocketService.sendMessage("ADD $newId $macAddress");
+
+      // Wait for three seconds
+      await Future.delayed(Duration(seconds: 3));
+
+      // Navigate to the horror page
+      Navigator.pop(
+        context,
+        MaterialPageRoute(
+            builder: (context) => App(
+                  database: _db,
+                )),
+      );
     } catch (e) {
       print('Error in _addNewDevice: $e');
+    } finally {
+      setState(() {
+        _isLoading = false; // Stop loading
+      });
     }
-  }
-
-  Future<List<String>> getAvailableIDs(Database db) async {
-    final List<Map<String, dynamic>> maps =
-        await db.query('devices', columns: ['id']);
-    return List.generate(maps.length, (i) {
-      return maps[i]['id'].toString(); // Convert ID to string
-    });
   }
 
   void _openCamera() async {
@@ -77,74 +98,78 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFe0e0e0),
       appBar: AppBar(
+        backgroundColor: const Color(0xFFe0e0e0),
         title: const Text("Add Device"),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          bool isTablet = constraints.maxWidth > 600;
-          return Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: Center(
-              child: DottedBorder(
-                borderWidth: 2,
-                borderColor: Colors.black,
-                child: Container(
-                  width: isTablet ? 800 : constraints.maxWidth * 0.9,
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        "Setting",
-                        style: TextStyle(
-                          fontStyle: FontStyle.italic,
-                          fontSize: isTablet ? 40.0 : 24.0,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 20),
-                      if (isTablet)
-                        IconButton(
-                          onPressed: _openCamera,
-                          icon: Icon(
-                            Icons.camera,
-                            size: 80,
-                            color: Colors.black,
-                          ),
-                        ),
-                      if (!isTablet)
-                        SizedBox(
-                          width: 100,
-                          child: IconButton(
-                            onPressed: _openCamera,
-                            icon: Icon(
-                              Icons.camera,
-                              size: 60,
+      body: Center(
+        child: _isLoading
+            ? CircularProgressIndicator() // Show loading indicator
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  bool isTablet = constraints.maxWidth > 600;
+                  return Padding(
+                    padding: const EdgeInsets.all(10.0),
+                    child: DottedBorder(
+                      borderWidth: 2,
+                      borderColor: Colors.black,
+                      child: Container(
+                        width: isTablet ? 800 : constraints.maxWidth * 0.9,
+                        padding: EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Setting",
+                              style: TextStyle(
+                                fontStyle: FontStyle.italic,
+                                fontSize: isTablet ? 40.0 : 24.0,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ),
-                      SizedBox(height: 20),
-                      Text(
-                        "رقم الشريحه",
-                        style: TextStyle(
-                          fontSize: isTablet ? 20.0 : 16.0,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF3497d3),
+                            SizedBox(height: 20),
+                            if (isTablet)
+                              IconButton(
+                                onPressed: _openCamera,
+                                icon: Icon(
+                                  Icons.camera,
+                                  size: 80,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            if (!isTablet)
+                              SizedBox(
+                                width: 100,
+                                child: IconButton(
+                                  onPressed: _openCamera,
+                                  icon: Icon(
+                                    Icons.camera,
+                                    size: 60,
+                                  ),
+                                ),
+                              ),
+                            SizedBox(height: 20),
+                            Text(
+                              "رقم الشريحه",
+                              style: TextStyle(
+                                fontSize: isTablet ? 20.0 : 16.0,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF3497d3),
+                              ),
+                            ),
+                            SizedBox(height: 10),
+                            _buildTextField("Enter MAC Address"),
+                            SizedBox(height: 20),
+                            AddNewDeviceButton(onPressed: _addNewDevice),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 10),
-                      _buildTextField("Enter MAC Address"),
-                      SizedBox(height: 20),
-                      AddNewDeviceButton(onPressed: _addNewDevice),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
-            ),
-          );
-        },
       ),
     );
   }

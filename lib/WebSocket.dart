@@ -31,10 +31,10 @@ class WebSocketService {
 
     try {
       if (kIsWeb) {
-        final wsUrl = Uri.parse('ws://192.168.4.1:80/ws');
+        final wsUrl = Uri.parse('ws://192.168.1.6:80/ws');
         _channel = WebSocketChannel.connect(wsUrl);
       } else {
-        _channel = IOWebSocketChannel.connect('ws://192.168.4.1:80/ws');
+        _channel = IOWebSocketChannel.connect('ws://192.168.1.6:80/ws');
       }
 
       _channel!.stream.listen(
