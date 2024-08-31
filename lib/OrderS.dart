@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:open_settings_plus/core/open_settings_plus.dart';
 import 'package:pager/Neworder.dart';
+import 'package:pager/Neworder2.dart';
 import 'package:pager/WebSocket.dart';
 import 'package:pager/img.dart';
 import 'package:pager/main.dart';
@@ -165,8 +167,13 @@ class _OrderScreenState extends State<OrderScreen> {
     });
   }
 
-  Future<void> _deleteOrder(String orderNumber) async {
+  Future<void> _deleteOrder(String orderNumber, int deviceNumber) async {
     await deleteOrderByOrderNumber(widget.database, orderNumber);
+    await insertOrUpdateDevice(
+      widget.database,
+      deviceNumber,
+      "available",
+    );
     _getLastOrderNumber();
     _search();
   }
@@ -342,25 +349,63 @@ class _OrderScreenState extends State<OrderScreen> {
                                 decoration: const InputDecoration(
                                   border: OutlineInputBorder(),
                                 ),
+                                keyboardType: TextInputType
+                                    .number, // This helps bring up the numeric keyboard on mobile devices
+                                inputFormatters: [
+                                  FilteringTextInputFormatter
+                                      .digitsOnly, // Restricts input to digits only
+                                ],
                               ),
                             ),
                             const SizedBox(height: 20),
-                            SizedBox(
-                              height: 70,
-                              width: 200,
-                              child: ElevatedButton(
-                                onPressed: _search,
-                                child: Text(
-                                  S.of(context).call,
-                                  style: const TextStyle(fontSize: 24),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15),
+                            Column(
+                              children: [
+                                SizedBox(
+                                  height: 70,
+                                  width: 200,
+                                  child: ElevatedButton(
+                                    onPressed: _search,
+                                    child: Text(
+                                      S.of(context).call,
+                                      style: const TextStyle(fontSize: 24),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                                SizedBox(
+                                  height: 10,
+                                ),
+                                SizedBox(
+                                  height: 50,
+                                  width: 200,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.pushAndRemoveUntil(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                DeviceManagementScreen2()),
+                                        (route) => true,
+                                      );
+                                    },
+                                    child: Text(
+                                      "ADD IVOICE",
+                                      style: const TextStyle(fontSize: 24),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -396,7 +441,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                         icon: const Icon(Icons.delete,
                                             color: Colors.red),
                                         onPressed: () => _deleteOrder(
-                                            order['order_number'].toString()),
+                                            order['order_number'].toString(),
+                                            int.parse(order['device_number'])),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.call,
@@ -535,6 +581,34 @@ class _OrderScreenState extends State<OrderScreen> {
                             ),
                           ),
                         ),
+                        SizedBox(
+                          height: 10,
+                        ),
+                        SizedBox(
+                          height: 50,
+                          width: 200,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        DeviceManagementScreen2()),
+                                (route) => true,
+                              );
+                            },
+                            child: Text(
+                              "ADD IVOICE",
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 10),
                         _searchResults.isNotEmpty
                             ? Container(
@@ -562,7 +636,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 color: Colors.red),
                                             onPressed: () => _deleteOrder(
                                                 order['order_number']
-                                                    .toString()),
+                                                    .toString(),
+                                                order['device_number']),
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.call,

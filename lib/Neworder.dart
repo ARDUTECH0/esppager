@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pager/addNewDevice.dart';
 import 'package:pager/img.dart';
 import 'package:pager/initDatabase.dart';
+import 'package:pager/main.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DottedBorder extends StatelessWidget {
@@ -90,11 +92,25 @@ class DeviceManagementScreen extends StatefulWidget {
 class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   List<DeviceStatus> devices = [];
   late Database _db;
+  Timer? _timer; // Add a Timer variable
+  bool _isDisposed = false;
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    // Cancel timers, listeners, or other operations here
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
     _initializeDatabase();
+
+    // Initialize a Timer to call _loadDevices every 2 seconds
+    _timer = Timer.periodic(Duration(seconds: 2), (timer) {
+      _loadDevices();
+    });
   }
 
   Future<void> _initializeDatabase() async {
@@ -104,6 +120,9 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
 
   Future<void> _loadDevices() async {
     List<Map<String, dynamic>> deviceRows = await getDevices(_db);
+
+    if (_isDisposed) return;
+
     setState(() {
       devices = deviceRows.map((row) {
         return DeviceStatus.available;
@@ -116,6 +135,29 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
       context,
       MaterialPageRoute(builder: (context) => AddDeviceScreen()),
     );
+  }
+
+  void _onDeleteDevice(int deviceNumber) async {
+    try {
+      // Assuming you have a function `deleteDevice` in your database code
+      await deleteDeviceById(_db, deviceNumber); // Delete device from database
+      setState(() {
+        devices.removeAt(deviceNumber - 1); // Remove device from UI list
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Device $deviceNumber deleted successfully.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete device: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _showNewRequestForm(
@@ -171,36 +213,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   }
 
   void _onDeviceTap(int deviceNumber) async {
-    try {
-      // Fetch orders based on the device number (assuming `device_number` matches the `deviceNumber`)
-      List<Map<String, dynamic>> orders =
-          await getOrdersByOrderNumber(_db, deviceNumber.toString());
-
-      if (orders.isNotEmpty) {
-        // Assuming that you only expect one order per device
-        Map<String, dynamic> order = orders.first;
-        _showNewRequestForm(
-          orderNumber: order['order_number'],
-          phoneNumber: order['phone_number'],
-          deviceNumber: order['device_number'],
-        );
-      } else {
-        // No order found for this device number
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No invoice found for this device.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to retrieve invoice: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    webSocketService.sendMessage("SEND $deviceNumber cheak");
   }
 
   Widget _buildTabletLayout(double width, double height) {
@@ -215,6 +228,8 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 AddNewDeviceButton(onPressed: _addNewDevice),
+                SizedBox(width: 20),
+
                 Container(
                   width: 500,
                   height: 500,
@@ -225,7 +240,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                       padding: const EdgeInsets.all(20),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
+                        crossAxisCount: 4,
                         mainAxisSpacing: 10.0,
                         crossAxisSpacing: 10.0,
                       ),
@@ -235,17 +250,18 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                           deviceNumber: index + 1,
                           status: devices[index],
                           onTap: _onDeviceTap,
+                          onDelete: _onDeleteDevice,
                         );
                       },
                     ),
                   ),
                 ),
-                SingleChildScrollView(
-                  child: DeviceDetailsPanel(
-                    width: panelWidth,
-                    height: 150,
-                  ),
-                ),
+                // SingleChildScrollView(
+                //   child: DeviceDetailsPanel(
+                //     width: panelWidth,
+                //     height: 150,
+                //   ),
+                // ),
               ],
             ),
           ),
@@ -269,7 +285,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
               child: GridView.builder(
                 padding: const EdgeInsets.all(10),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
+                  crossAxisCount: 4,
                   mainAxisSpacing: 10.0,
                   crossAxisSpacing: 10.0,
                 ),
@@ -279,6 +295,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                     deviceNumber: index + 1,
                     status: devices[index],
                     onTap: _onDeviceTap,
+                    onDelete: _onDeleteDevice,
                   );
                 },
               ),
@@ -296,15 +313,21 @@ class DeviceTile extends StatelessWidget {
   final int deviceNumber;
   final DeviceStatus status;
   final Function(int) onTap;
+  final Function(int) onDelete; // New callback for delete action
 
-  const DeviceTile(
-      {required this.deviceNumber, required this.status, required this.onTap});
+  const DeviceTile({
+    required this.deviceNumber,
+    required this.status,
+    required this.onTap,
+    required this.onDelete, // Pass delete function
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () =>
-          onTap(deviceNumber), // Trigger the callback with the device number
+      onTap: () => onTap(deviceNumber), // Single tap prints device number
+      onLongPress: () => _showDeleteDialog(
+          context, deviceNumber), // Long press shows delete option
       child: Container(
         decoration: BoxDecoration(
           image: DecorationImage(
@@ -325,6 +348,35 @@ class DeviceTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // Show a dialog with delete option when long-pressed
+  void _showDeleteDialog(BuildContext context, int deviceNumber) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Device'),
+          content:
+              Text('Are you sure you want to delete device $deviceNumber?'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            TextButton(
+              child: Text('Delete'),
+              onPressed: () {
+                onDelete(deviceNumber); // Trigger delete callback
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -427,47 +479,44 @@ class _DeviceDetailsPanelState extends State<DeviceDetailsPanel> {
   }
 
   Future<void> _saveChanges() async {
-    try {
-      if (widget.isEditing) {
-        // Assumes ID is the order number in this context. Adjust if needed.
-        await updateOrder(
-          _db,
-          _orderNumberController.text,
-          _deviceNumberController.text,
-          _phoneNumberController.text,
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Order updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        await insertOrder(
-          _db,
-          _orderNumberController.text,
-          _deviceNumberController.text,
-          _phoneNumberController.text,
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Order added successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-      // Clear fields after successful operation
-      _orderNumberController.clear();
-      _deviceNumberController.clear();
-      _phoneNumberController.clear();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to save order: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    // try {
+    //   if (widget.isEditing) {
+    //     await updateOrder(
+    //       _db,
+    //       _orderNumberController.text,
+    //     );
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(
+    //         content: Text('Order updated successfully!'),
+    //         backgroundColor: Colors.green,
+    //       ),
+    //     );
+    //   } else {
+    //     await insertOrder(
+    //       _db,
+    //       _orderNumberController.text,
+    //       _deviceNumberController.text,
+    //       _phoneNumberController.text,
+    //     );
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(
+    //         content: Text('Order added successfully!'),
+    //         backgroundColor: Colors.green,
+    //       ),
+    //     );
+    //   }
+    //   // Clear fields after successful operation
+    //   _orderNumberController.clear();
+    //   _deviceNumberController.clear();
+    //   _phoneNumberController.clear();
+    // } catch (e) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     SnackBar(
+    //       content: Text('Failed to save order: $e'),
+    //       backgroundColor: Colors.red,
+    //     ),
+    //   );
+    // }
   }
 
   @override

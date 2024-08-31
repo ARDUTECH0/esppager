@@ -31,6 +31,16 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
     _initializeDatabase();
   }
 
+  // Check if a MAC address exists in the database
+  Future<bool> doesMacAddressExist(Database db, String macAddress) async {
+    List<Map<String, dynamic>> result = await db.query(
+      'Devices', // Table name
+      where: 'mac_address = ?', // Use 'mac_address' instead of 'macAddress'
+      whereArgs: [macAddress],
+    );
+    return result.isNotEmpty; // Returns true if the MAC address exists
+  }
+
   Future<void> _initializeDatabase() async {
     _db = await initDatabase();
   }
@@ -52,6 +62,23 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
         return; // Exit the function if MAC address is empty
       }
 
+      // Check if the MAC address already exists
+      bool exists = await doesMacAddressExist(_db, macAddress);
+      if (exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Error: MAC address already exists. Device not added.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        print('Error: MAC address already exists. Device not added.');
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
       int newId = await addNewDevice(_db, macAddress);
       print('ADD $newId $macAddress');
       webSocketService.sendMessage("ADD $newId $macAddress");
@@ -59,13 +86,14 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
       // Wait for three seconds
       await Future.delayed(Duration(seconds: 3));
 
-      // Navigate to the horror page
+      // Navigate to the main page (or whichever page is required)
       Navigator.pop(
         context,
         MaterialPageRoute(
-            builder: (context) => App(
-                  database: _db,
-                )),
+          builder: (context) => App(
+            database: _db,
+          ),
+        ),
       );
     } catch (e) {
       print('Error in _addNewDevice: $e');

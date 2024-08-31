@@ -4,7 +4,7 @@ import 'package:sqflite/sqflite.dart';
 // Initialize the database
 Future<Database> initDatabase() async {
   var databasesPath = await getDatabasesPath();
-  String path = join(databasesPath, 'orders.db');
+  String path = join(databasesPath, 'orders3.db');
 
   return await openDatabase(
     path,
@@ -22,7 +22,9 @@ Future<Database> initDatabase() async {
       await db.execute('''
         CREATE TABLE Devices (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          mac_address TEXT NOT NULL
+          mac_address TEXT NOT NULL,    
+          status INTEGER NOT NULL DEFAULT 1 -- 1 تعني true و 0 تعني false
+
         )
       ''');
     },
@@ -81,6 +83,20 @@ Future<List<Map<String, dynamic>>> getOrdersByOrderNumber(
   }
 }
 
+Future<List<Map<String, dynamic>>> getOrdersByDeviceNumber(
+    Database db, String orderNumber) async {
+  try {
+    return await db.query(
+      'Orders',
+      where: 'device_number = ?',
+      whereArgs: [orderNumber],
+    );
+  } catch (e) {
+    print('Error querying orders by order number: $e');
+    rethrow;
+  }
+}
+
 // Query an order by ID
 Future<Map<String, dynamic>?> getOrderById(Database db, int id) async {
   try {
@@ -115,11 +131,42 @@ Future<int> insertDevice(Database db, String macAddress, int id) async {
   try {
     return await db.insert(
       'Devices',
-      {'id': id, 'mac_address': macAddress},
+      {'id': id, 'mac_address': macAddress, 'status': "available"},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   } catch (e) {
     print('Error inserting device: $e');
+    rethrow;
+  }
+}
+
+Future<void> insertOrUpdateDevice(Database db, int id, String status) async {
+  try {
+    // Check if a device with the given ID already exists
+    final existingDevice = await db.query(
+      'Devices',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (existingDevice.isNotEmpty) {
+      // Device exists, so update it
+      await db.update(
+        'Devices',
+        {'status': status},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } else {
+      // Device does not exist, so insert it
+      await db.insert(
+        'Devices',
+        {'id': id, 'status': status},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  } catch (e) {
+    print('Error inserting or updating device: $e');
     rethrow;
   }
 }
@@ -163,6 +210,21 @@ Future<void> deleteDeviceByMacAddress(Database db, String macAddress) async {
   }
 }
 
+// Delete a device by ID
+Future<void> deleteDeviceById(Database db, int id) async {
+  try {
+    await db.delete(
+      'Devices',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    print('Device with ID $id deleted successfully.');
+  } catch (e) {
+    print('Error deleting device by ID: $e');
+    rethrow;
+  }
+}
+
 // Fetch the latest device ID
 Future<int> getLatestDeviceId(Database db) async {
   try {
@@ -183,20 +245,30 @@ Future<int> getLatestDeviceId(Database db) async {
   }
 }
 
-Future<void> updateOrder(Database db, String orderNumber, String deviceNumber,
-    String phoneNumber) async {
+// Update the order number for an existing order
+Future<void> updateOrderNumber(
+    Database db, String oldOrderNumber, String newOrderNumber) async {
   try {
-    await db.update(
+    // Update the order number where the old order number matches
+    int count = await db.update(
       'Orders',
       {
-        'device_number': deviceNumber,
-        'phone_number': phoneNumber,
+        'order_number': newOrderNumber, // Set the new order number
       },
-      where: 'order_number = ?',
-      whereArgs: [orderNumber],
+      where: 'order_number = ?', // Find the row with the old order number
+      whereArgs: [
+        oldOrderNumber
+      ], // Provide the old order number as the argument
     );
+
+    if (count > 0) {
+      print(
+          "Order number updated successfully from $oldOrderNumber to $newOrderNumber.");
+    } else {
+      print("No order found with the order number: $oldOrderNumber.");
+    }
   } catch (e) {
-    print('Error updating order: $e');
+    print('Error updating order number: $e');
     rethrow;
   }
 }

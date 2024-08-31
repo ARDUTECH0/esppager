@@ -247,3 +247,34 @@ Future<void> deleteOrderByOrderNumber(Database db, String orderNumber) async {
     whereArgs: [orderNumber],
   );
 }
+
+Future<void> insertOrUpdateDevice(Database db, int id, String status) async {
+  try {
+    // Check if a device with the given ID already exists
+    final existingDevice = await db.query(
+      'Devices',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (existingDevice.isNotEmpty) {
+      // Device exists, so update it
+      await db.update(
+        'Devices',
+        {'status': status},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } else {
+      // Device does not exist, so insert it
+      await db.insert(
+        'Devices',
+        {'id': id, 'status': status},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  } catch (e) {
+    print('Error inserting or updating device: $e');
+    rethrow;
+  }
+}
